@@ -18,6 +18,13 @@ function toCamelCase (obj) {
   return res
 }
 
+class PayError extends Error {
+  constructor (message, totalSent) {
+    super(message)
+    this.totalSent = totalSent
+  }
+}
+
 class PullError extends Error {
   constructor (message, totalReceived) {
     super(message)
@@ -81,9 +88,18 @@ async function pay (plugin, {
     })
 
     const payStream = ilpConn.createStream()
-    await payStream.sendTotal(sendAmount)
 
+    try {
+      await payStream.sendTotal(sendAmount, { timeout: streamOpts.timeout })
+    } catch (err) {
+      const totalSenttotalReceived = stream.totalSent
+      await ilpConn.end()
+      throw new PayError('Failed to send specified amount', totalSent)
+    }
+
+    const totalSent = stream.totalSent
     await ilpConn.end()
+    return totalSent
     // } else if (response.contentType.indexOf('application/spsp+json') !== -1) {
     // This should technically check for application/spsp+json but due to a bug the old
     // ilp-spsp-server was returning application/json instead, and this code should stay
@@ -156,5 +172,6 @@ module.exports = {
   query,
   pay,
   pull,
+  PayError,
   PullError
 }
